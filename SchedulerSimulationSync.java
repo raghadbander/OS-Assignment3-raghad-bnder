@@ -2,12 +2,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.Random;
-// TODO (Feature 1 and Feature 2): import java.util.concurrent.locks.ReentrantLock;
-// TODO (Feature 3):               import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantLock;
 
 // ANSI Color Codes for enhanced terminal output (same as Assignment 1)
 class Colors {
@@ -61,45 +58,77 @@ class SharedStats {
     static long totalServiceTime = 0;         // shared accumulator: sum of the CPU time (ms) actually executed
     // Number of times a CPU found the ready queue empty and polled it again (busy waiting). Must be 0 after Feature 3.
     static final java.util.concurrent.atomic.AtomicInteger busyWaitPolls = new java.util.concurrent.atomic.AtomicInteger(0);
-
+// Lock protecting the three shared statistical variables
+    private static final ReentrantLock statsLock = new ReentrantLock();
     // TODO Feature 2: declare the lock(s) protecting the three shared variables above here.
     // Think about it: ONE lock for the three variables, or ONE lock PER variable? (you must justify it in MY_WORK.md)
 
-    public static void incrementContextSwitch() {
-        // TODO Feature 2: protect this critical section
-        int tmp = contextSwitchCount;       // 1) read
-        RaceWindow.pause();                 //    <- another thread can read the SAME value here
-        contextSwitchCount = tmp + 1;       // 2) write  (one increment is lost if someone else did the same)
+public static void incrementContextSwitch() {
+        // Protect critical section when incrementing context switch count
+        statsLock.lock();
+        try {
+            int tmp = contextSwitchCount;       // 1) read
+            RaceWindow.pause();                 //    <- another thread can read the SAME value here
+            contextSwitchCount = tmp + 1;       // 2) write  (one increment is lost if someone else did the same)
+        } finally {
+            statsLock.unlock();
+        }
     }
 
-    public static void incrementCompletedProcess() {
-        // TODO Feature 2: protect this critical section
-        int tmp = completedProcessCount;
-        RaceWindow.pause();
-        completedProcessCount = tmp + 1;
+  public static void incrementCompletedProcess() {
+        // Protect critical section when incrementing completed process count
+        statsLock.lock();
+        try {
+            int tmp = completedProcessCount;
+            RaceWindow.pause();
+            completedProcessCount = tmp + 1;
+        } finally {
+            statsLock.unlock();
+        }
     }
 
-    public static void addServiceTime(int ms) {
-        // TODO Feature 2: protect this critical section
-        long tmp = totalServiceTime;
-        RaceWindow.pause();
-        totalServiceTime = tmp + ms;
+  public static void addServiceTime(int ms) {
+        // Protect critical section when adding service time
+        statsLock.lock();
+        try {
+            long tmp = totalServiceTime;
+            RaceWindow.pause();
+            totalServiceTime = tmp + ms;
+        } finally {
+            statsLock.unlock();
+        }
     }
 
     // Readers must also be protected (a read in the middle of an update is not safe either)
+// Readers must also be protected (a read in the middle of an update is not safe either)
     public static int getCompletedProcessCount() {
-        // TODO Feature 2: protect this read
-        return completedProcessCount;
+        // Protect read operation for completed process count
+        statsLock.lock();
+        try {
+            return completedProcessCount;
+        } finally {
+            statsLock.unlock();
+        }
     }
 
     public static int getContextSwitchCount() {
-        // TODO Feature 2: protect this read
-        return contextSwitchCount;
+        // Protect read operation for context switch count
+        statsLock.lock();
+        try {
+            return contextSwitchCount;
+        } finally {
+            statsLock.unlock();
+        }
     }
 
     public static long getTotalServiceTime() {
-        // TODO Feature 2: protect this read
-        return totalServiceTime;
+        // Protect read operation for total service time
+        statsLock.lock();
+        try {
+            return totalServiceTime;
+        } finally {
+            statsLock.unlock();
+        }
     }
 }
 
